@@ -13,6 +13,7 @@ import { Linkedin, Github, Youtube, Mail } from 'lucide-react';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import { ThemeSelector } from './components/ThemeSelector';
 import { TransitionOverlay } from './components/TransitionOverlay';
+import { cursorState } from './components/CustomCursor'; // Import for Parallax
 
 const useSmoothRgb = (rgbString: string) => {
   const r = useSpring(0, { stiffness: 50, damping: 20 });
@@ -58,6 +59,11 @@ const PortfolioContent = () => {
     '--font-heading': isPlainText ? 'monospace' : currentTheme.fonts.heading,
     '--font-primary': isPlainText ? 'monospace' : currentTheme.fonts.primary,
 
+    // Layout and Typography
+    '--letter-spacing': currentTheme.layout.letterSpacing,
+    '--font-weight': currentTheme.layout.fontWeight,
+    '--line-height': currentTheme.layout.lineHeight,
+
     // Structure (Instant - transitions handled by CSS if needed)
     '--radius': currentTheme.structure.radius,
     '--border-width': currentTheme.structure.borderWidth,
@@ -66,13 +72,43 @@ const PortfolioContent = () => {
     '--shadow': currentTheme.structure.shadow,
   } as any;
 
-  // Sync body background for overscroll
+  // Parallax Ref
+  const parallaxRef = React.useRef<HTMLDivElement>(null);
+
+  // Sync body background and apply Gradient + Parallax
   useEffect(() => {
-    const unsubscribe = bgPrimary.on("change", (latest: any) => {
-      document.body.style.backgroundColor = `rgb(${latest})`;
-    });
-    return () => unsubscribe();
-  }, [bgPrimary]);
+    let animationFrame: number;
+
+    const update = () => {
+      // Update Background Color
+      const r = bgPrimary.get();
+      document.body.style.backgroundColor = `rgb(${r})`;
+
+      // Apply Gradient
+      const gradient = currentTheme.gradient;
+      const color1 = `rgba(${currentTheme.colors.bgPrimary.split(' ').join(',')}, 1)`;
+      const color2 = `rgba(${currentTheme.colors.bgCard.split(' ').join(',')}, 1)`;
+
+      // Construct css gradient string
+      const gradientString = gradient.type === 'radial'
+        ? `radial-gradient(${gradient.direction}, ${color1}, ${color2})`
+        : `${gradient.type}-gradient(${gradient.direction}, ${color1}, ${color2})`;
+
+      document.body.style.backgroundImage = gradientString;
+
+      // Apply Parallax to Content (Mid Layer -> 0.02 factor for subtle depth)
+      // We use direct DOM manipulation for performance (no React render)
+      if (parallaxRef.current) {
+        const x = (cursorState.x / window.innerWidth - 0.5) * 20; // +/- 10px
+        const y = (cursorState.y / window.innerHeight - 0.5) * 20;
+        parallaxRef.current.style.transform = `translate3d(${-x}px, ${-y}px, 0)`;
+      }
+
+      animationFrame = requestAnimationFrame(update);
+    };
+    update();
+    return () => cancelAnimationFrame(animationFrame);
+  }, [currentTheme, bgPrimary]);
 
   return (
     <motion.div
@@ -80,7 +116,15 @@ const PortfolioContent = () => {
       style={themeStyles}
       className={`relative min-h-screen transition-colors duration-700 ${isPlainText ? 'bg-black font-mono' : 'bg-transparent font-sans'} text-text-primary selection:bg-accent-primary selection:text-bg overflow-x-hidden`}
     >
-      <div className={!isPlainText ? "" : ""}>
+      <div
+        className={!isPlainText ? "" : ""}
+        style={{
+          fontFamily: 'var(--font-primary)',
+          letterSpacing: 'var(--letter-spacing)',
+          lineHeight: 'var(--line-height)',
+          fontWeight: 'var(--font-weight)'
+        } as any}
+      >
         <style>{`
         .overlay-mandala {
            background-image: radial-gradient(circle at center, transparent 0%, rgba(28, 4, 4, 0.8) 100%), repeating-linear-gradient(45deg, rgba(255, 215, 0, 0.03) 0px, rgba(255, 215, 0, 0.03) 1px, transparent 1px, transparent 10px);
@@ -114,7 +158,7 @@ const PortfolioContent = () => {
         {!isPlainText && <LiquidBackground />}
         {!isPlainText && <Navigation />}
 
-        <main className={`relative z-10 ${isPlainText ? 'pb-12 px-4 max-w-4xl mx-auto pt-20' : 'pb-32 md:pb-40'}`}>
+        <main ref={parallaxRef} className={`relative z-10 ${isPlainText ? 'pb-12 px-4 max-w-4xl mx-auto pt-20' : 'pb-32 md:pb-40'}`}>
 
           {isPlainText ? (
             <div className="mb-20 border-b border-white/20 pb-12">

@@ -22,6 +22,16 @@ export const ThemeSelector = () => {
         completeOnboarding(themeId);
     };
 
+    // Dynamic exit transition based on the selected theme's personality
+    const getExitTransition = () => {
+        if (!selected) return { duration: 0.8 };
+        const config = THEMES[selected];
+        return {
+            duration: config.motion.duration,
+            ease: config.motion.ease as any
+        };
+    };
+
     return (
         <AnimatePresence>
             {!exiting && (
@@ -29,7 +39,7 @@ export const ThemeSelector = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0, scale: 1.1, filter: 'blur(20px)' }}
-                    transition={{ duration: 0.8 }}
+                    transition={getExitTransition()}
                     className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6"
                 >
                     <motion.div

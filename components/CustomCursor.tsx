@@ -1,6 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 
+// GLOBAL PHYSICS STATE (Exported for LiquidBackground)
+export const cursorState = {
+  x: 0,
+  y: 0,
+  vx: 0,
+  vy: 0
+};
+
+// Global tracker initialization
+if (typeof window !== 'undefined') {
+  let lastX = 0;
+  let lastY = 0;
+  window.addEventListener('pointermove', (e) => {
+    cursorState.vx = e.clientX - lastX;
+    cursorState.vy = e.clientY - lastY;
+    cursorState.x = e.clientX;
+    cursorState.y = e.clientY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+}
+
 export const CustomCursor = React.memo(() => {
   const [isHovering, setIsHovering] = useState(false);
   const cursorX = useMotionValue(-100);

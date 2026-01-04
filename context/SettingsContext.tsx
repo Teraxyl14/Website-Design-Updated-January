@@ -32,6 +32,23 @@ export interface ThemeConfig {
   physics: {
     speed: number;
     turbulence: number;
+    viscosity: number;
+    cursorForce: number;
+    influenceRadius: number;
+  };
+  motion: {
+    ease: string;
+    duration: number;
+    stagger: number;
+  };
+  layout: {
+    letterSpacing: string;
+    fontWeight: string;
+    lineHeight: string;
+  };
+  gradient: {
+    type: 'linear' | 'radial' | 'angular';
+    direction: string; // e.g., "to bottom", "circle at center", "45deg"
   };
   overlay: 'none' | 'scanlines' | 'grain' | 'vignette' | 'mandala';
 }
@@ -75,7 +92,10 @@ export const THEMES: Record<ThemeMode, ThemeConfig> = {
       heading: 'Sora',
       primary: 'Inter',
     },
-    physics: { speed: 0.2, turbulence: 1.5 }, // Increased speed/turbulence for visibility
+    physics: { speed: 0.2, turbulence: 1.5, viscosity: 0.88, cursorForce: 0.32, influenceRadius: 320 },
+    motion: { ease: "cubic-bezier(0.34, 1.56, 0.64, 1)", duration: 0.8, stagger: 0.1 }, // Elastic/Springy
+    layout: { letterSpacing: "0.02em", fontWeight: "400", lineHeight: "1.6" },
+    gradient: { type: 'angular', direction: '135deg' },
     overlay: 'none'
   },
   cyberpunk: {
@@ -104,7 +124,10 @@ export const THEMES: Record<ThemeMode, ThemeConfig> = {
       heading: 'JetBrains Mono',
       primary: 'Inter',
     },
-    physics: { speed: 0.5, turbulence: 0.0 },
+    physics: { speed: 0.5, turbulence: 0.0, viscosity: 0.92, cursorForce: 0.18, influenceRadius: 260 },
+    motion: { ease: "steps(5)", duration: 0.3, stagger: 0.05 }, // Digital/Glitchy
+    layout: { letterSpacing: "0.05em", fontWeight: "500", lineHeight: "1.4" },
+    gradient: { type: 'linear', direction: 'to bottom' },
     overlay: 'scanlines'
   },
   sakura: {
@@ -133,7 +156,10 @@ export const THEMES: Record<ThemeMode, ThemeConfig> = {
       heading: 'Cinzel',
       primary: 'Quicksand',
     },
-    physics: { speed: 0.1, turbulence: 0.3 },
+    physics: { speed: 0.1, turbulence: 0.3, viscosity: 0.96, cursorForce: 0.08, influenceRadius: 180 },
+    motion: { ease: "cubic-bezier(0.4, 0, 0.2, 1)", duration: 1.2, stagger: 0.2 }, // Airy/Floaty
+    layout: { letterSpacing: "0.01em", fontWeight: "300", lineHeight: "1.8" },
+    gradient: { type: 'radial', direction: 'circle at center' },
     overlay: 'vignette'
   },
   lofi: {
@@ -162,7 +188,10 @@ export const THEMES: Record<ThemeMode, ThemeConfig> = {
       heading: 'Quicksand',
       primary: 'Inter',
     },
-    physics: { speed: 0.05, turbulence: 0.1 },
+    physics: { speed: 0.05, turbulence: 0.1, viscosity: 0.95, cursorForce: 0.10, influenceRadius: 200 },
+    motion: { ease: "cubic-bezier(0.25, 0.46, 0.45, 0.94)", duration: 1.0, stagger: 0.15 }, // Relaxed
+    layout: { letterSpacing: "0.03em", fontWeight: "400", lineHeight: "1.7" },
+    gradient: { type: 'linear', direction: 'to bottom right' },
     overlay: 'grain'
   },
   royal: {
@@ -191,7 +220,10 @@ export const THEMES: Record<ThemeMode, ThemeConfig> = {
       heading: 'Cinzel',
       primary: 'Inter',
     },
-    physics: { speed: 0.1, turbulence: 0.2 },
+    physics: { speed: 0.1, turbulence: 0.2, viscosity: 0.85, cursorForce: 0.45, influenceRadius: 350 },
+    motion: { ease: "cubic-bezier(0.16, 1, 0.3, 1)", duration: 1.5, stagger: 0.1 }, // Grand/Slow
+    layout: { letterSpacing: "0.05em", fontWeight: "600", lineHeight: "1.5" },
+    gradient: { type: 'radial', direction: 'circle at 50% 30%' },
     overlay: 'mandala'
   }
 };

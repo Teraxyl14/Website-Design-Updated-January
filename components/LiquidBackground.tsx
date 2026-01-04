@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree, createPortal, extend } from '@react-three/f
 import { Stars, Float, useFBO, shaderMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 import { useSettings } from '../context/SettingsContext';
+import { cursorState } from './CustomCursor';
 
 import { THEMES, ThemeConfig, ThemeMode } from '../context/SettingsContext';
 
@@ -135,13 +136,52 @@ const LiquidEngine = ({ config }: { config: any }) => {
     uniforms.uResolution.value.set(size.width, size.height);
   }, [size, uniforms]);
 
+  // Physics State for this engine
+  const physicsState = useRef({
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0
+  });
+
   useFrame((state, delta) => {
     if (!meshRef.current) return;
     const mat = meshRef.current.material as THREE.ShaderMaterial;
 
+    // Config Physics
+    const { viscosity, cursorForce } = config.physics;
+
     if (!isPaused) {
       mat.uniforms.uTime.value += delta;
-      mat.uniforms.uMouse.value.set(state.pointer.x * 0.5 + 0.5, state.pointer.y * 0.5 + 0.5);
+
+      // Calculate target normalized position (0..1)
+      const targetX = cursorState.x / size.width;
+      const targetY = 1.0 - (cursorState.y / size.height); // Shader UV is Y up
+
+      // Physics Simulation
+      const phys = physicsState.current;
+
+      // Hooke's Law / Spring-like drag
+      const dx = targetX - phys.x;
+      const dy = targetY - phys.y;
+
+      // Add force
+      phys.vx += dx * cursorForce * 0.1;
+      phys.vy += dy * cursorForce * 0.1;
+
+      // Apply Drag (Viscosity)
+      phys.vx *= viscosity;
+      phys.vy *= viscosity;
+
+      // Update Position
+      phys.x += phys.vx;
+      phys.y += phys.vy;
+
+      // Pass the "fluid" mouse position
+      mat.uniforms.uMouse.value.set(phys.x, phys.y);
+
+      // Optionally could pass velocity as turbulence factor
+      // mat.uniforms.uTurbulence.value = config.physics.turbulence + (Math.abs(phys.vx) + Math.abs(phys.vy)) * 5.0;
     }
   });
 
@@ -192,14 +232,28 @@ const InteractiveCyberGrid = ({ config }: { config: any }) => {
     uSpeed: { value: config.physics.speed }
   }), [config]);
 
+  // Physics State for CyberGrid
+  const physicsState = useRef({ x: 0, y: 0 });
+
   useFrame((state, delta) => {
     if (!meshRef.current) return;
     const mat = meshRef.current.material as THREE.ShaderMaterial;
     if (!isPaused) {
       mat.uniforms.uTime.value += delta;
-      // Map pointer (-1..1) to grid size (approx 300 units wide). 
-      // Multiplier 150 ensures mouse can reach edges.
-      mat.uniforms.uMouse.value.set(state.pointer.x * 150, state.pointer.y * 150);
+
+      const { viscosity, cursorForce } = config.physics;
+
+      // Map cursorState (screen pixels) to approximately Grid Space (-150 to 150)
+      // Screen width maps to ~300 units wide grid
+      const targetX = ((cursorState.x / window.innerWidth) * 2 - 1) * 150;
+      const targetY = -((cursorState.y / window.innerHeight) * 2 - 1) * 150; // Invert Y
+
+      // Smooth "Drag" Logic
+      const phys = physicsState.current;
+      phys.x += (targetX - phys.x) * (1 - viscosity) * (cursorForce * 5); // Force amplifies responsiveness
+      phys.y += (targetY - phys.y) * (1 - viscosity) * (cursorForce * 5);
+
+      mat.uniforms.uMouse.value.set(phys.x, phys.y);
     }
   });
   return (<mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -10, 0]}><planeGeometry args={[300, 300, 64, 64]} /><shaderMaterial vertexShader={CYBER_GRID_VERTEX} fragmentShader={CYBER_GRID_FRAGMENT} uniforms={uniforms} transparent depthWrite={false} extensions={shaderExtensions as any} opacity={0.6} /></mesh>);
@@ -276,34 +330,52 @@ const PETAL_VERTEX = `
   void main() {
     vUv = uv;
     
-    // --- 1. Infinite Waterfall Logic ---
-    vec3 pos = aOffset;
-    float fallDist = uTime * uVerticalSpeed * aSpeed;
-    float height = 140.0; // Taller buffer space for smoother wrap
+    // --- 1. ROBUST INFINITE WATERFALL (FRACT METHOD) ---
+    // fract() always returns positive 0..1, even for negative inputs on most modern GLSL
+    // pos.y = (progress - 0.5) * height
     
-    pos.y = mod(pos.y - fallDist + 70.0, height) - 70.0;
+    float height = 150.0;
+    float fallSpeed = uVerticalSpeed * aSpeed;
+    
+    // Normalize y to 0..1 space based on height
+    float normalizedY = (aOffset.y + 75.0) / height; // 0..1
+    
+    // Shift by time (looping 0..1)
+    float timeShift = fract(uTime * fallSpeed / height);
+    
+    // Calculate new normalized position (wrapping)
+    float progress = fract(normalizedY - timeShift);
+    
+    // Map back to world space -75..75
+    vec3 pos = aOffset;
+    pos.y = (progress * height) - 75.0;
     
     // --- 2. Chaotic Wind ---
-    pos.x += sin(uTime * uWindSpeed + pos.y * 0.05) * 5.0;
-    pos.z += cos(uTime * 0.5 + pos.x * 0.1) * 2.0;
+    pos.x += sin(uTime * uWindSpeed + aOffset.y * 0.1) * 3.0; // Use aOffset.y for phase to avoid tearing
+    pos.z += cos(uTime * 0.5 + aOffset.x * 0.05) * 2.0;
 
     // --- 3. Living Interaction (Swirl & Glow) ---
-    float dist = distance(pos.xy, uMouseWorld.xy);
-    float interaction = 1.0 - smoothstep(0.0, uMouseRadius, dist);
+    float distToMouse = distance(pos.xy, uMouseWorld.xy);
+    float interaction = 1.0 - smoothstep(0.0, uMouseRadius, distToMouse);
     
+    // Only apply heavy displacement if close
     if (interaction > 0.0) {
-      vec2 pushDir = normalize(pos.xy - uMouseWorld.xy + vec2(0.001));
-      pos.xy += pushDir * interaction * 80.0;
-      vec2 swirlDir = vec2(-pushDir.y, pushDir.x);
-      pos.xy += swirlDir * interaction * 40.0;
-      pos.z += interaction * 40.0;
+      vec2 pushDir = normalize(pos.xy - uMouseWorld.xy + vec2(0.001)); // Avoid div0
+      pos.xy += pushDir * interaction * 60.0;
+      pos.z += interaction * 30.0;
+      
+      // Swirl
+      vec2 swirl = vec2(-pushDir.y, pushDir.x);
+      pos.xy += swirl * interaction * 20.0;
     }
 
-    vColor = mix(aColor, vec3(1.5, 0.2, 0.2), interaction * 0.9);
+    // Color mixing (Calm Red -> Bright highlight)
+    vColor = mix(aColor, vec3(1.0, 0.9, 0.9), interaction * 0.6);
     
-    // --- 4. Transform ---
-    float rotAngle = uTime * aRotSpeed + (interaction * 10.0);
-    mat4 instanceRot = rotationMatrix(vec3(sin(aOffset.x), cos(aOffset.y), sin(aOffset.z)), rotAngle);
+    // --- 4. Rotation ---
+    // Rotate based on time and interaction
+    float rotAngle = uTime * aRotSpeed + interaction * 5.0;
+    mat4 instanceRot = rotationMatrix(vec3(sin(aOffset.x), cos(aOffset.y * 0.5), 0.5), rotAngle);
     
     vec4 localPosition = vec4(position * aScale, 1.0);
     localPosition = instanceRot * localPosition;
@@ -350,28 +422,33 @@ const ZenBlossom = ({ config }: { config: any }) => {
     const rotSpeeds = new Float32Array(count);
     const colors = new Float32Array(count * 3);
 
-    // VIBRANT PALETTE (Strictly RED/CRIMSON as requested)
+    // CALM SAKURA PALETTE
     const palette = [
-      new THREE.Color('#ff0000'), // Pure Red
-      new THREE.Color('#dc143c'), // Crimson
-      new THREE.Color('#b30000'), // Dark Red
-      new THREE.Color('#ff3366'), // Red-Pink Accent
+      new THREE.Color('#ffc1cc'), // Bubblegum Pink (Soft)
+      new THREE.Color('#ffb7b2'), // Pastel Red
+      new THREE.Color('#ffdac1'), // Peach
+      new THREE.Color('#ffe5e5'), // Very Pale Pink
     ];
 
     for (let i = 0; i < count; i++) {
       offsets[i * 3 + 0] = randomRange(-150, 150);
-      offsets[i * 3 + 1] = randomRange(-70, 70);
-      offsets[i * 3 + 2] = randomRange(-60, 40);
+      // Distribute Y so they start pre-filled across the height
+      offsets[i * 3 + 1] = randomRange(-75, 75);
+      // FIX: Push Z back so they don't clip camera (Camera is at +15)
+      offsets[i * 3 + 2] = randomRange(-80, -10);
 
-      scales[i] = randomRange(0.2, 0.6); // Slightly larger
-      speeds[i] = randomRange(0.4, 1.5);
-      rotSpeeds[i] = randomRange(0.5, 3.0);
+      scales[i] = randomRange(0.4, 0.8); // Bigger, softer petals
+      speeds[i] = randomRange(0.5, 1.2);
+      rotSpeeds[i] = randomRange(0.5, 2.0);
 
       const col = palette[Math.floor(Math.random() * palette.length)];
       colors[i * 3 + 0] = col.r;
       colors[i * 3 + 1] = col.g;
       colors[i * 3 + 2] = col.b;
     }
+
+    // Explicitly set bounding sphere to HUGE to prevent culling
+    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 500);
 
     geo.setAttribute('aOffset', new THREE.InstancedBufferAttribute(offsets, 3));
     geo.setAttribute('aScale', new THREE.InstancedBufferAttribute(scales, 1));
@@ -381,10 +458,10 @@ const ZenBlossom = ({ config }: { config: any }) => {
 
     const unifs = {
       uTime: { value: 0 },
-      uVerticalSpeed: { value: 12.0 },
-      uWindSpeed: { value: 0.5 }, // More wind
+      uVerticalSpeed: { value: 15.0 }, // Slightly faster fall
+      uWindSpeed: { value: 0.3 },
       uMouseWorld: { value: new THREE.Vector3(1000, 1000, 1000) },
-      uMouseRadius: { value: 75.0 }, // Larger interaction radius
+      uMouseRadius: { value: 100.0 },
     };
 
     return { geometry: geo, uniforms: unifs };
@@ -396,12 +473,42 @@ const ZenBlossom = ({ config }: { config: any }) => {
     const mat = meshRef.current.material as THREE.ShaderMaterial;
     mat.uniforms.uTime.value += delta;
 
-    // --- PRECISE MOUSE TRACKING ---
-    raycaster.setFromCamera(state.pointer, state.camera);
-    raycaster.ray.intersectPlane(plane, target);
+    // --- PRECISE PHYSICS MOUSE TRACKING ---
+    // 1. Convert Global Cursor to Normalized Device Coords (-1..1) for Raycaster
+    const ndcX = (cursorState.x / window.innerWidth) * 2 - 1;
+    const ndcY = -(cursorState.y / window.innerHeight) * 2 + 1; // Flip Y
 
-    // Update Uniform
-    mat.uniforms.uMouseWorld.value.copy(target);
+    // 2. Raycast to find "Ideal" World Position
+    raycaster.setFromCamera({ x: ndcX, y: ndcY } as any, state.camera);
+    const hit = raycaster.ray.intersectPlane(plane, target);
+
+    // Only update if we actually hit the physics plane
+    if (hit) {
+      // 3. Apply Viscosity/Smoothing to the Uniform Value
+      const currentPos = mat.uniforms.uMouseWorld.value;
+      const { viscosity, cursorForce } = config.physics;
+
+      const lerpFactor = (1 - viscosity) * 2.0; // Responsiveness
+
+      currentPos.x = THREE.MathUtils.lerp(currentPos.x, target.x, lerpFactor);
+      currentPos.y = THREE.MathUtils.lerp(currentPos.y, target.y, lerpFactor);
+
+      // Safety Clamp for Velocity inputs
+      const safeVx = Math.min(Math.abs(cursorState.vx), 50); // Clamp max speed influence
+      const safeVy = Math.min(Math.abs(cursorState.vy), 50);
+
+      // Update Interaction Radius dynamically based on interaction force
+      // Clamp the radius to prevent explosion
+      const targetRadius = config.physics.influenceRadius + (safeVx + safeVy) * 0.5;
+      const safeRadius = Math.min(targetRadius, 500); // Max radius cap
+
+      mat.uniforms.uMouseRadius.value = THREE.MathUtils.lerp(
+        mat.uniforms.uMouseRadius.value,
+        safeRadius,
+        0.1
+      );
+    }
+    // If no hit (e.g. mouse off screen), we just keep the last known position/radius (or could slowly decay radius)
   });
 
   return (
@@ -433,8 +540,48 @@ const RainParticles = ({ config }: { config: any }) => {
   const { isPaused } = useSettings();
   useFrame((state) => {
     if (!meshRef.current) return;
-    const mouseX = state.pointer.x * 40; const mouseY = state.pointer.y * 20;
-    particles.forEach((p, i) => { p.y -= p.velocity; if (p.y < -30) p.y = 50; let posX = p.x; let posY = p.y; const dx = posX - mouseX; const dist = Math.sqrt(dx * dx + (posY - mouseY) * (posY - mouseY)); if (dist < 25) { const f = (25 - dist) / 25; posX += (dx / dist) * f * 4; } dummy.position.set(posX, posY, p.z); dummy.scale.set(0.05, p.length, 0.05); dummy.updateMatrix(); meshRef.current!.setMatrixAt(i, dummy.matrix); });
+
+    // Physics parameters from theme config
+    const { viscosity, cursorForce, influenceRadius } = config.physics;
+
+    particles.forEach((p, i) => {
+      // Gravity
+      p.y -= p.velocity;
+      if (p.y < -30) p.y = 50;
+
+      let posX = p.x;
+      let posY = p.y;
+
+      // Calculate distance to cursor (using global tracking for speed/precision)
+      // Convert cursor page coords to approx world coords for this scene setup
+      // Note: This scene is roughly 100 wide units.
+      // We map cursor (0..window) to world (-50..50 approx)
+      const mappedCursorX = (cursorState.x / window.innerWidth) * 100 - 50;
+      const mappedCursorY = -(cursorState.y / window.innerHeight) * 100 + 50; // Invert Y
+
+      const dx = mappedCursorX - posX;
+      const dy = mappedCursorY - posY;
+      const dist = Math.sqrt(dx * dx + dy * dy) + 0.001;
+
+      // Interaction Logic (Push)
+      if (dist < influenceRadius * 0.2) { // Scale radius for this scene scale
+        const force = (1 - dist / (influenceRadius * 0.2)) * cursorForce * 40; // Boost force
+
+        // Add velocity influence
+        // Simplified push away
+        posX -= (dx / dist) * force * 0.1;
+
+        // Add swirl/drag from cursor velocity
+        // const velX = (cursorState.vx / window.innerWidth) * 100;
+
+        p.x = THREE.MathUtils.lerp(p.x, posX, 0.1);
+      }
+
+      dummy.position.set(p.x, Math.max(p.y, -30), p.z);
+      dummy.scale.set(0.05, p.length, 0.05);
+      dummy.updateMatrix();
+      meshRef.current!.setMatrixAt(i, dummy.matrix);
+    });
     meshRef.current.instanceMatrix.needsUpdate = true;
   });
   return (<instancedMesh ref={meshRef} args={[undefined, undefined, count]}><boxGeometry args={[1, 1, 1]} /><meshBasicMaterial color={config.colors.hexSecondary} transparent opacity={0.4} /></instancedMesh>);
@@ -460,7 +607,22 @@ const MandalaRing = ({ count, radius, scale, zOffset, geometry, color, speed }: 
 const GoldenMandala3D = ({ config }: { config: any }) => {
   const groupRef = useRef<THREE.Group>(null);
   const petalGeo = useMemo(() => new THREE.ConeGeometry(0.5, 1.5, 4), []); const orbGeo = useMemo(() => new THREE.SphereGeometry(0.3, 16, 16), []); const ringGeo = useMemo(() => new THREE.TorusGeometry(0.4, 0.1, 8, 24), []);
-  useFrame((state) => { if (groupRef.current) { const tiltX = -state.pointer.y * 0.6; const tiltY = state.pointer.x * 0.6; groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, tiltX, 0.1); groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, tiltY, 0.1); } });
+  useFrame((state) => {
+    if (groupRef.current) {
+      const { viscosity, cursorForce } = config.physics;
+
+      // Map cursor to tilt range (-0.6 to 0.6 radians)
+      const targetTiltX = -((cursorState.y / window.innerHeight) * 2 - 1) * 0.6 * cursorForce * 3;
+      const targetTiltY = ((cursorState.x / window.innerWidth) * 2 - 1) * 0.6 * cursorForce * 3;
+
+      // Apply viscous interpolation (Fluid damping)
+      // Using lerp with (1-viscosity) gives us the "lag" effect
+      const lerpFactor = (1 - viscosity) * 0.5;
+
+      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetTiltX, lerpFactor);
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetTiltY, lerpFactor);
+    }
+  });
   return (<group ref={groupRef} scale={1.5}><pointLight position={[0, 0, 5]} intensity={2} color={config.colors.hexAccent} distance={20} /><ambientLight intensity={0.5} /><mesh position={[0, 0, 0]}><sphereGeometry args={[1, 32, 32]} /><meshStandardMaterial color={config.colors.hexAccent} emissive={config.colors.hexSecondary} emissiveIntensity={0.5} /></mesh><MandalaRing count={8} radius={2.5} scale={1} zOffset={0} geometry={petalGeo} color={config.colors.hexSecondary} speed={0.2} /><MandalaRing count={16} radius={4} scale={0.6} zOffset={-0.5} geometry={orbGeo} color={config.colors.hexAccent} speed={-0.15} /><MandalaRing count={24} radius={6} scale={0.8} zOffset={-1} geometry={petalGeo} color={config.colors.hexSecondary} speed={0.1} /><MandalaRing count={12} radius={8} scale={1.5} zOffset={-2} geometry={ringGeo} color={config.colors.hexAccent} speed={-0.05} /></group>);
 };
 
