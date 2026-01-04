@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { motion, useSpring, useTransform } from 'framer-motion';
 import { LiquidBackground } from './components/LiquidBackground';
 import { HeroSection } from './components/HeroSection';
@@ -45,7 +45,7 @@ const PortfolioContent = () => {
   const borderColor = useSmoothRgb(isPlainText ? '50 50 50' : currentTheme.colors.border);
 
   // Memoize theme styles (including MotionValues)
-  const themeStyles = {
+  const themeStyles = useMemo(() => ({
     // Colors (MotionValues update these variables every frame)
     '--bg-primary': bgPrimary,
     '--bg-card': bgCard,
@@ -70,7 +70,7 @@ const PortfolioContent = () => {
     '--glass-opacity': currentTheme.structure.glassOpacity,
     '--glass-blur': currentTheme.structure.glassBlur,
     '--shadow': currentTheme.structure.shadow,
-  } as any;
+  } as any), [bgPrimary, bgCard, textPrimary, textSecondary, accentPrimary, accentSecondary, borderColor, isPlainText, currentTheme]);
 
   // Parallax Ref
   const parallaxRef = React.useRef<HTMLDivElement>(null);
@@ -158,6 +158,9 @@ const PortfolioContent = () => {
         {!isPlainText && <LiquidBackground />}
         {!isPlainText && <Navigation />}
 
+        {/* Portal Target for Overlays (Inherits Theme Variables) */}
+        <div id="overlay-root" className="fixed inset-0 z-[100] pointer-events-none" />
+
         <main ref={parallaxRef} className={`relative z-10 ${isPlainText ? 'pb-12 px-4 max-w-4xl mx-auto pt-20' : 'pb-32 md:pb-40'}`}>
 
           {isPlainText ? (
@@ -216,7 +219,10 @@ const PortfolioContent = () => {
 
                   <div className="space-y-8 max-w-2xl">
                     <p className="text-xl md:text-2xl text-text-primary font-medium leading-relaxed">
-                      Technology should be <span className="text-accent-primary">seamless</span>, like a fluid. My strength isn't just in understanding code; it's in orchestrating AI models to flow around real-world problems.
+                      Technology should be <span className="text-accent-primary">seamless</span>, like a fluid.
+                      <span className="block mt-4 text-text-secondary">
+                        I turn manual processes into intelligent, <span className="text-text-primary">automated workflows</span>.
+                      </span>
                     </p>
 
                     <div className="grid md:grid-cols-2 gap-8 text-left">

@@ -324,9 +324,14 @@ export const ReportArchive = () => {
                             ))}
                           </div>
                           <div className="mt-6">
-                            <button className="w-full py-3 rounded-lg bg-accent-primary/10 hover:bg-accent-primary text-accent-primary hover:text-bg text-xs font-bold uppercase tracking-wider transition-colors border border-accent-primary/20 hover:border-accent-primary">
+                            <a
+                              href="https://drive.google.com/drive/folders/1xn49JAB2EzzKk6KXaSoXefvJvJQ-RKv3?usp=sharing"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block w-full text-center py-3 rounded-lg bg-accent-primary/10 hover:bg-accent-primary text-accent-primary hover:text-bg text-xs font-bold uppercase tracking-wider transition-colors border border-accent-primary/20 hover:border-accent-primary"
+                            >
                               Read Full Report
-                            </button>
+                            </a>
                           </div>
                         </div>
                       </div>

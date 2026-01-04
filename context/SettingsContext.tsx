@@ -65,10 +65,13 @@ interface SettingsContextType {
   transitionPhase: TransitionPhase; // Exposed for the overlay
 }
 
+// Export Context for Bridge usage
+export const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
+
 export const THEMES: Record<ThemeMode, ThemeConfig> = {
   default: {
     id: 'default',
-    name: 'Liquid Void',
+    name: 'Liquid State',
     colors: {
       bgPrimary: '2 4 8',           // #020408 (Deepest Navy)
       bgCard: '13 17 23',           // #0d1117 (GitHub Dark Dimmed)
@@ -100,7 +103,7 @@ export const THEMES: Record<ThemeMode, ThemeConfig> = {
   },
   cyberpunk: {
     id: 'cyberpunk',
-    name: 'Neon City',
+    name: 'Cyber Grid',
     colors: {
       bgPrimary: '5 5 5',           // #050505 (True Black)
       bgCard: '15 15 15',           // #0F0F0F
@@ -132,7 +135,7 @@ export const THEMES: Record<ThemeMode, ThemeConfig> = {
   },
   sakura: {
     id: 'sakura',
-    name: 'Kyoto Bloom',
+    name: 'Organic Flow',
     colors: {
       bgPrimary: '255 241 242',     // #fff1f2 (Pale Pink)
       bgCard: '255 255 255',
@@ -164,7 +167,7 @@ export const THEMES: Record<ThemeMode, ThemeConfig> = {
   },
   lofi: {
     id: 'lofi',
-    name: 'Chill Study',
+    name: 'Deep Focus',
     colors: {
       bgPrimary: '30 28 45',        // #1e1c2d (Deep Grape)
       bgCard: '40 37 60',           // #28253c
@@ -196,7 +199,7 @@ export const THEMES: Record<ThemeMode, ThemeConfig> = {
   },
   royal: {
     id: 'royal',
-    name: 'Indian Heritage',
+    name: 'Royal Legacy',
     colors: {
       bgPrimary: '28 4 4',           // #1c0404 (Deep Royal Maroon)
       bgCard: '43 10 10',            // #2b0a0a (Darker Red)
@@ -228,8 +231,6 @@ export const THEMES: Record<ThemeMode, ThemeConfig> = {
   }
 };
 
-const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
-
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [themeMode, setInternalThemeMode] = useState<ThemeMode>('default');
   const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>('idle');
@@ -237,10 +238,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [isPaused, setIsPaused] = useState(false);
   const [isPlainText, setIsPlainText] = useState(false);
 
-  // Initialize from localStorage, default to false
+  // Initialize from sessionStorage to reset on new session (tab close)
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('hasSeenOnboarding') === 'true';
+      return sessionStorage.getItem('hasSeenOnboarding') === 'true';
     }
     return false;
   });
@@ -282,7 +283,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setHasSeenOnboarding(true);
 
       localStorage.setItem('theme', themeId);
-      localStorage.setItem('hasSeenOnboarding', 'true');
+      sessionStorage.setItem('hasSeenOnboarding', 'true');
     }, 1500); // 1.5s allows Iris to be mostly closed
 
     // 3. Open Logic

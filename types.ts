@@ -15,6 +15,7 @@ export interface SkillCategory {
     label: string;
     value: string;
   }[];
+  description?: string;
 }
 
 export interface Report {

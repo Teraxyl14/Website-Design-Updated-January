@@ -1,8 +1,8 @@
 import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { Canvas, useFrame, useThree, createPortal, extend } from '@react-three/fiber';
-import { Stars, Float, useFBO, shaderMaterial } from '@react-three/drei';
+import { Stars, Float, useFBO, shaderMaterial, useContextBridge } from '@react-three/drei';
 import * as THREE from 'three';
-import { useSettings } from '../context/SettingsContext';
+import { useSettings, SettingsContext } from '../context/SettingsContext';
 import { cursorState } from './CustomCursor';
 
 import { THEMES, ThemeConfig, ThemeMode } from '../context/SettingsContext';
@@ -533,13 +533,13 @@ const ZenBlossom = ({ config }: { config: any }) => {
   );
 };
 
-// 4. LOFI
+// 4. LOFI (Deep Focus)
 const RainParticles = ({ config }: { config: any }) => {
   const meshRef = useRef<THREE.InstancedMesh>(null); const dummy = useMemo(() => new THREE.Object3D(), []); const count = 250;
   const particles = useMemo(() => new Array(count).fill(0).map(() => ({ x: randomRange(-50, 50), y: randomRange(0, 100), z: randomRange(-20, 20), velocity: randomRange(0.2, 0.5), length: randomRange(0.5, 1.5) })), []);
   const { isPaused } = useSettings();
   useFrame((state) => {
-    if (!meshRef.current) return;
+    if (!meshRef.current || isPaused) return;
 
     // Physics parameters from theme config
     const { viscosity, cursorForce, influenceRadius } = config.physics;
@@ -571,9 +571,6 @@ const RainParticles = ({ config }: { config: any }) => {
         // Simplified push away
         posX -= (dx / dist) * force * 0.1;
 
-        // Add swirl/drag from cursor velocity
-        // const velX = (cursorState.vx / window.innerWidth) * 100;
-
         p.x = THREE.MathUtils.lerp(p.x, posX, 0.1);
       }
 
@@ -588,16 +585,24 @@ const RainParticles = ({ config }: { config: any }) => {
 };
 const BokehBackground = ({ config }: { config: any }) => {
   const groupRef = useRef<THREE.Group>(null);
-  useFrame((state) => { if (groupRef.current) { groupRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.05) * 0.1; groupRef.current.position.x = THREE.MathUtils.lerp(groupRef.current.position.x, state.pointer.x * 2, 0.05); groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, state.pointer.y * 2, 0.05); } });
+  const { isPaused } = useSettings();
+  useFrame((state) => {
+    if (groupRef.current && !isPaused) {
+      groupRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.05) * 0.1;
+      groupRef.current.position.x = THREE.MathUtils.lerp(groupRef.current.position.x, state.pointer.x * 2, 0.05);
+      groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, state.pointer.y * 2, 0.05);
+    }
+  });
   return (<group ref={groupRef} position={[0, 0, -40]}><Float speed={1} rotationIntensity={0.2} floatIntensity={0.5}><mesh position={[-15, 5, 0]}><circleGeometry args={[8, 32]} /><meshBasicMaterial color={config.colors.hexBg} transparent opacity={0.3} /></mesh></Float><Float speed={1.5} rotationIntensity={0.1} floatIntensity={0.7}><mesh position={[10, -5, -5]}><circleGeometry args={[12, 32]} /><meshBasicMaterial color={config.colors.hexAccent} transparent opacity={0.2} /></mesh></Float><Float speed={0.8} rotationIntensity={0.3} floatIntensity={0.4}><mesh position={[0, 10, -2]}><circleGeometry args={[6, 32]} /><meshBasicMaterial color={config.colors.hexSecondary} transparent opacity={0.2} /></mesh></Float></group>);
 };
 const MidnightCruise3D = ({ config }: { config: any }) => { return (<><fog attach="fog" args={[config.colors.hexBg, 5, 60]} /><RainParticles config={config} /><BokehBackground config={config} /><ambientLight intensity={0.2} /></>); };
 
-// 5. ROYAL
+// 5. ROYAL (Royal Legacy)
 const MandalaRing = ({ count, radius, scale, zOffset, geometry, color, speed }: any) => {
   const meshRef = useRef<THREE.InstancedMesh>(null); const dummy = useMemo(() => new THREE.Object3D(), []);
+  const { isPaused } = useSettings();
   useFrame((state) => {
-    if (!meshRef.current) return;
+    if (!meshRef.current || isPaused) return;
     const distToCenter = Math.sqrt(state.pointer.x * state.pointer.x + state.pointer.y * state.pointer.y); const bloomFactor = Math.max(0, 1 - distToCenter * 1.5); const dynamicRadius = radius + (bloomFactor * 2); const dynamicRotation = state.clock.elapsedTime * speed * (1 + bloomFactor * 2);
     for (let i = 0; i < count; i++) { const angle = (i / count) * Math.PI * 2 + dynamicRotation; const x = Math.cos(angle) * dynamicRadius; const y = Math.sin(angle) * dynamicRadius; dummy.position.set(x, y, zOffset); dummy.rotation.z = angle - Math.PI / 2; dummy.rotation.x = -Math.PI / 2; const pulse = 1 + Math.sin(state.clock.elapsedTime * 2 + i) * 0.1; dummy.scale.setScalar(scale * pulse); dummy.updateMatrix(); meshRef.current.setMatrixAt(i, dummy.matrix); }
     meshRef.current.instanceMatrix.needsUpdate = true;
@@ -607,8 +612,9 @@ const MandalaRing = ({ count, radius, scale, zOffset, geometry, color, speed }: 
 const GoldenMandala3D = ({ config }: { config: any }) => {
   const groupRef = useRef<THREE.Group>(null);
   const petalGeo = useMemo(() => new THREE.ConeGeometry(0.5, 1.5, 4), []); const orbGeo = useMemo(() => new THREE.SphereGeometry(0.3, 16, 16), []); const ringGeo = useMemo(() => new THREE.TorusGeometry(0.4, 0.1, 8, 24), []);
+  const { isPaused } = useSettings();
   useFrame((state) => {
-    if (groupRef.current) {
+    if (groupRef.current && !isPaused) {
       const { viscosity, cursorForce } = config.physics;
 
       // Map cursor to tilt range (-0.6 to 0.6 radians)
@@ -758,6 +764,9 @@ export const LiquidBackground = React.memo(() => {
 
 
 
+  // Bridge Context into Canvas
+  const ContextBridge = useContextBridge(SettingsContext);
+
   return (
     <div className="fixed inset-0 z-0 bg-bg">
       <Canvas
@@ -767,15 +776,17 @@ export const LiquidBackground = React.memo(() => {
         eventSource={document.body}
         className="pointer-events-none"
       >
-        {/* PORTALS: Render the Engines into the Vault */}
-        {createPortal(<LiquidEngine config={THEMES.default} />, scenes[0])}
-        {createPortal(<NeonCity config={THEMES.cyberpunk} />, scenes[1])}
-        {createPortal(<ZenBlossom config={THEMES.sakura} />, scenes[2])}
-        {createPortal(<MidnightCruise3D config={THEMES.lofi} />, scenes[3])}
-        {createPortal(<GoldenMandala3D config={THEMES.royal} />, scenes[4])}
+        <ContextBridge>
+          {/* PORTALS: Render the Engines into the Vault */}
+          {createPortal(<LiquidEngine config={THEMES.default} />, scenes[0])}
+          {createPortal(<NeonCity config={THEMES.cyberpunk} />, scenes[1])}
+          {createPortal(<ZenBlossom config={THEMES.sakura} />, scenes[2])}
+          {createPortal(<MidnightCruise3D config={THEMES.lofi} />, scenes[3])}
+          {createPortal(<GoldenMandala3D config={THEMES.royal} />, scenes[4])}
 
-        {/* ORCHESTRATOR: Handles the switching */}
-        <RenderOrchestrator scenes={scenes} />
+          {/* ORCHESTRATOR: Handles the switching */}
+          <RenderOrchestrator scenes={scenes} />
+        </ContextBridge>
       </Canvas>
     </div>
   );

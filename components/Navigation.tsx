@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Home, User, Briefcase, FileText, Cpu, Mail, ChevronRight } from 'lucide-react';
+import { Home, User, Briefcase, FileText, Cpu, Mail, ChevronRight } from 'lucide-react';
 import { SOCIALS } from '../constants';
 import { useSettings } from '../context/SettingsContext';
 
@@ -97,8 +97,9 @@ export const Navigation = () => {
             </AnimatePresence>
           </div>
 
-          {/* Desktop Nav (Horizontal - Keeping for quick access, but mobile menu is removed in favor of Logo Menu) */}
-          <div className="hidden md:flex items-center gap-8">
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center gap-6">
+            <ISTClock />
             <a
               href={`mailto:${SOCIALS.email}`}
               className="px-5 py-2.5 text-sm font-bold bg-[rgb(var(--text-primary))] text-[rgb(var(--bg-primary))] rounded-full hover:bg-[rgb(var(--accent-primary))] transition-colors shadow-[0_0_20px_rgba(var(--accent-primary),0.2)] hover:shadow-[0_0_30px_rgba(var(--accent-primary),0.4)]"
@@ -109,5 +110,50 @@ export const Navigation = () => {
         </div>
       </motion.nav>
     </>
+  );
+};
+
+const ISTClock = () => {
+  const [time, setTime] = useState('');
+  const [date, setDate] = useState('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+
+      // Time Options
+      const timeOptions: Intl.DateTimeFormatOptions = {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: true,
+      };
+
+      // Date Options
+      const dateOptions: Intl.DateTimeFormatOptions = {
+        timeZone: 'Asia/Kolkata',
+        weekday: 'short',
+        month: 'short',
+        day: '2-digit',
+      };
+
+      setTime(new Intl.DateTimeFormat('en-US', timeOptions).format(now) + ' IST');
+      setDate(new Intl.DateTimeFormat('en-US', dateOptions).format(now));
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="hidden lg:flex flex-col items-end text-right mr-4 border-r border-border pr-6">
+      <div className="text-[rgb(var(--text-primary))] font-mono text-sm font-bold tracking-widest">
+        {time}
+      </div>
+      <div className="text-[rgb(var(--text-secondary))] text-[10px] font-bold tracking-wider uppercase">
+        {date}
+      </div>
+    </div>
   );
 };
