@@ -137,29 +137,29 @@ export const THEMES: Record<ThemeMode, ThemeConfig> = {
     id: 'sakura',
     name: 'Organic Flow',
     colors: {
-      bgPrimary: '255 241 242',     // #fff1f2 (Pale Pink)
-      bgCard: '255 255 255',
-      textPrimary: '80 15 30',      // #500f1e (Deep Burgundy)
-      textSecondary: '157 23 77',   // #9d174d (Strong Pink Text)
-      accentPrimary: '225 29 72',   // #e11d48 (Rose)
-      accentSecondary: '190 24 93', // #be185d (Deep Magenta)
-      border: '251 207 232',        // #fbcfe8 (Light Pink Border)
-      hexAccent: '#e11d48',
-      hexSecondary: '#be185d',
-      hexBg: '#fff1f2',
+      bgPrimary: '255 245 245',     // #fff5f5 (Very Pale Warm White)
+      bgCard: '255 255 255',        // White Card
+      textPrimary: '66 10 10',      // #420a0a (Dark Brown/Red Text)
+      textSecondary: '139 34 34',   // #8b2222 (Muted Red Text)
+      accentPrimary: '220 20 60',   // #dc143c (Crimson)
+      accentSecondary: '178 34 34', // #b22222 (Firebrick)
+      border: '255 200 200',        // #ffc8c8 (Pale Red Border)
+      hexAccent: '#dc143c',
+      hexSecondary: '#b22222',
+      hexBg: '#fff5f5',
     },
     structure: {
       radius: '24px',
       borderWidth: '1px',
-      glassOpacity: '0.65',
-      glassBlur: '20px',
-      shadow: '0 20px 60px -15px rgba(225, 29, 72, 0.15)'
+      glassOpacity: '0.9',
+      glassBlur: '12px',
+      shadow: '0 20px 60px -15px rgba(220, 20, 60, 0.15)'
     },
     fonts: {
       heading: 'Cinzel',
       primary: 'Quicksand',
     },
-    physics: { speed: 0.1, turbulence: 0.3, viscosity: 0.96, cursorForce: 0.08, influenceRadius: 180 },
+    physics: { speed: 0.1, turbulence: 0.3, viscosity: 0.92, cursorForce: 0.6, influenceRadius: 300 },
     motion: { ease: "cubic-bezier(0.4, 0, 0.2, 1)", duration: 1.2, stagger: 0.2 }, // Airy/Floaty
     layout: { letterSpacing: "0.01em", fontWeight: "300", lineHeight: "1.8" },
     gradient: { type: 'radial', direction: 'circle at center' },

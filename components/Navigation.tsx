@@ -50,7 +50,7 @@ export const Navigation = () => {
       >
         <div className="w-full px-6 flex items-center justify-between" ref={menuRef}>
           {/* Interactive Logo / Menu Trigger */}
-          <div className="relative ml-12 md:ml-16">
+          <div className="relative">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="group flex items-center justify-center px-6 py-3 rounded-full border border-border bg-card/50 backdrop-blur-md hover:bg-accent-primary/10 transition-all duration-300 hover:scale-105 active:scale-95 focus:outline-none"
@@ -97,12 +97,12 @@ export const Navigation = () => {
             </AnimatePresence>
           </div>
 
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-6">
+          {/* Right Side Utils */}
+          <div className="flex items-center gap-3 md:gap-6">
             <ISTClock />
             <a
               href={`mailto:${SOCIALS.email}`}
-              className="px-5 py-2.5 text-sm font-bold bg-[rgb(var(--text-primary))] text-[rgb(var(--bg-primary))] rounded-full hover:bg-[rgb(var(--accent-primary))] transition-colors shadow-[0_0_20px_rgba(var(--accent-primary),0.2)] hover:shadow-[0_0_30px_rgba(var(--accent-primary),0.4)]"
+              className="px-3 py-2 md:px-5 md:py-2.5 text-xs md:text-sm font-bold bg-[rgb(var(--text-primary))] text-[rgb(var(--bg-primary))] rounded-full hover:bg-[rgb(var(--accent-primary))] transition-colors shadow-[0_0_20px_rgba(var(--accent-primary),0.2)] hover:shadow-[0_0_30px_rgba(var(--accent-primary),0.4)] whitespace-nowrap"
             >
               Let's Talk
             </a>
@@ -147,11 +147,11 @@ const ISTClock = () => {
   }, []);
 
   return (
-    <div className="hidden lg:flex flex-col items-end text-right mr-4 border-r border-border pr-6">
-      <div className="text-[rgb(var(--text-primary))] font-mono text-sm font-bold tracking-widest">
+    <div className="hidden sm:flex flex-col items-end text-right mr-2 md:mr-4 border-r border-border pr-3 md:pr-6">
+      <div className="text-[rgb(var(--text-primary))] font-mono text-[10px] md:text-sm font-bold tracking-widest whitespace-nowrap">
         {time}
       </div>
-      <div className="text-[rgb(var(--text-secondary))] text-[10px] font-bold tracking-wider uppercase">
+      <div className="text-[rgb(var(--text-secondary))] text-[8px] md:text-[10px] font-bold tracking-wider uppercase hidden md:block">
         {date}
       </div>
     </div>

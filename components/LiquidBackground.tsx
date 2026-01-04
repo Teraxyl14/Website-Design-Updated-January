@@ -297,15 +297,16 @@ const NeonCity = ({ config }: { config: any }) => {
   return (<><fog attach="fog" args={[config.colors.hexBg, 20, 180]} /><Stars radius={150} depth={50} count={2000} factor={4} saturation={0} fade speed={0.5} /><RetroSun config={config} /><InteractiveCyberGrid config={config} /><NeonBuildings config={config} /><CyberParticles config={config} /></>);
 }
 
-// 3. SAKURA
+// 3. SAKURA (Organic Flow)
+// ----------------------------------------------------
+// Advanced Flow Field Vertex Shader
 const PETAL_VERTEX = `
   precision highp float;
   
   uniform float uTime;
-  uniform float uVerticalSpeed;
-  uniform float uWindSpeed;
-  uniform vec3 uMouseWorld; // Exact world position
+  uniform vec3 uMouseWorld;
   uniform float uMouseRadius;
+  uniform float uCursorForce;
   
   attribute vec3 aOffset;    
   attribute float aScale;
@@ -315,7 +316,56 @@ const PETAL_VERTEX = `
   
   varying vec2 vUv;
   varying vec3 vColor;
-  
+  varying float vDepth;
+
+  // --- SIMPLEX NOISE 3D ---
+  vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+  vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+  vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
+  vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+  float snoise(vec3 v) {
+    const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
+    const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+    vec3 i  = floor(v + dot(v, C.yyy) );
+    vec3 x0 = v - i + dot(i, C.xxx) ;
+    vec3 g = step(x0.yzx, x0.xyz);
+    vec3 l = 1.0 - g;
+    vec3 i1 = min( g.xyz, l.zxy );
+    vec3 i2 = max( g.xyz, l.zxy );
+    vec3 x1 = x0 - i1 + C.xxx;
+    vec3 x2 = x0 - i2 + C.yyy;
+    vec3 x3 = x0 - D.yyy;
+    i = mod289(i);
+    vec4 p = permute( permute( permute( i.z + vec4(0.0, i1.z, i2.z, 1.0 )) + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
+    float n_ = 0.142857142857;
+    vec3  ns = n_ * D.wyz - D.xzx;
+    vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+    vec4 x_ = floor(j * ns.z);
+    vec4 y_ = floor(j - 7.0 * x_ );
+    vec4 x = x_ *ns.x + ns.yyyy;
+    vec4 y = y_ *ns.x + ns.yyyy;
+    vec4 h = 1.0 - abs(x) - abs(y);
+    vec4 b0 = vec4( x.xy, y.xy );
+    vec4 b1 = vec4( x.zw, y.zw );
+    vec4 s0 = floor(b0)*2.0 + 1.0;
+    vec4 s1 = floor(b1)*2.0 + 1.0;
+    vec4 sh = -step(h, vec4(0.0));
+    vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
+    vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
+    vec3 p0 = vec3(a0.xy,h.x);
+    vec3 p1 = vec3(a0.zw,h.y);
+    vec3 p2 = vec3(a1.xy,h.z);
+    vec3 p3 = vec3(a1.zw,h.w);
+    vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+    p0 *= norm.x;
+    p1 *= norm.y;
+    p2 *= norm.z;
+    p3 *= norm.w;
+    vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+    m = m * m;
+    return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3) ) );
+  }
+
   mat4 rotationMatrix(vec3 axis, float angle) {
     axis = normalize(axis);
     float s = sin(angle);
@@ -329,59 +379,70 @@ const PETAL_VERTEX = `
 
   void main() {
     vUv = uv;
+    vColor = aColor;
     
-    // --- 1. ROBUST INFINITE WATERFALL (FRACT METHOD) ---
-    // fract() always returns positive 0..1, even for negative inputs on most modern GLSL
-    // pos.y = (progress - 0.5) * height
-    
-    float height = 150.0;
-    float fallSpeed = uVerticalSpeed * aSpeed;
-    
-    // Normalize y to 0..1 space based on height
-    float normalizedY = (aOffset.y + 75.0) / height; // 0..1
-    
-    // Shift by time (looping 0..1)
-    float timeShift = fract(uTime * fallSpeed / height);
-    
-    // Calculate new normalized position (wrapping)
-    float progress = fract(normalizedY - timeShift);
-    
-    // Map back to world space -75..75
+    // Base position
     vec3 pos = aOffset;
-    pos.y = (progress * height) - 75.0;
     
-    // --- 2. Chaotic Wind ---
-    pos.x += sin(uTime * uWindSpeed + aOffset.y * 0.1) * 3.0; // Use aOffset.y for phase to avoid tearing
-    pos.z += cos(uTime * 0.5 + aOffset.x * 0.05) * 2.0;
+    // Time & Speed factoring
+    float t = uTime * 0.1 * aSpeed;
+    
+    // --- ORGANIC FLOW FIELD ---
+    // Use Simplex Noise to create a "Wind Field"
+    float nx = snoise(vec3(pos.x * 0.005 + t, pos.y * 0.005, pos.z * 0.005));
+    float ny = snoise(vec3(pos.x * 0.005, pos.y * 0.005 + t, pos.z * 0.005));
+    float nz = snoise(vec3(pos.x * 0.005, pos.y * 0.005, pos.z * 0.005 + t));
+    
+    // Apply continuous flow
+    pos.x += nx * 50.0;
+    pos.y += ny * 30.0;
+    pos.z += nz * 30.0;
+    
+    // Infinite Vertical Loop (Waterfall effect, but organic)
+    float loopH = 250.0;
+    float fall = uTime * 10.0 * aSpeed;
+    pos.y -= fall;
+    pos.y = mod(pos.y + 125.0, loopH) - 125.0; // Wrap -125 to 125
 
-    // --- 3. Living Interaction (Swirl & Glow) ---
+    // --- INTERACTIVE TURBULENCE ---
     float distToMouse = distance(pos.xy, uMouseWorld.xy);
-    float interaction = 1.0 - smoothstep(0.0, uMouseRadius, distToMouse);
     
-    // Only apply heavy displacement if close
-    if (interaction > 0.0) {
-      vec2 pushDir = normalize(pos.xy - uMouseWorld.xy + vec2(0.001)); // Avoid div0
-      pos.xy += pushDir * interaction * 60.0;
-      pos.z += interaction * 30.0;
-      
-      // Swirl
-      vec2 swirl = vec2(-pushDir.y, pushDir.x);
-      pos.xy += swirl * interaction * 20.0;
+    // Smooth interaction sphere
+    float interact = smoothstep(uMouseRadius * 1.5, 0.0, distToMouse);
+    
+    if (interact > 0.0) {
+       // Direction from mouse to particle
+       vec3 dir = normalize(pos - uMouseWorld);
+       
+       // Repulsion Force (Push away)
+       float repel = interact * 80.0 * uCursorForce;
+       pos += dir * repel;
+       
+       // Swirl Force (Cross product approximation for 2D rotation)
+       vec3 swirl = vec3(-dir.y, dir.x, 0.0);
+       pos += swirl * interact * 40.0 * uCursorForce;
+       
+       // Lift (Upward draft)
+       pos.z += interact * 30.0 * uCursorForce;
     }
-
-    // Color mixing (Calm Red -> Bright highlight)
-    vColor = mix(aColor, vec3(1.0, 0.9, 0.9), interaction * 0.6);
     
-    // --- 4. Rotation ---
-    // Rotate based on time and interaction
-    float rotAngle = uTime * aRotSpeed + interaction * 5.0;
-    mat4 instanceRot = rotationMatrix(vec3(sin(aOffset.x), cos(aOffset.y * 0.5), 0.5), rotAngle);
+    // --- ROTATION & BREATHING ---
+    // Rotate petals naturally
+    float rot = uTime * aRotSpeed + interact * 5.0;
+    vec3 axis = normalize(vec3(sin(aOffset.x), cos(aOffset.z), sin(aOffset.y * 0.5)));
     
-    vec4 localPosition = vec4(position * aScale, 1.0);
-    localPosition = instanceRot * localPosition;
-    localPosition.xyz += pos;
+    mat4 rotMat = rotationMatrix(axis, rot);
     
-    gl_Position = projectionMatrix * viewMatrix * modelMatrix * localPosition;
+    // Breathing scale (pulsing life)
+    float breathe = 1.0 + 0.1 * sin(uTime * 3.0 + aOffset.x);
+    
+    vec4 localPos = vec4(position * aScale * breathe, 1.0);
+    localPos = rotMat * localPos;
+    localPos.xyz += pos;
+    
+    vDepth = localPos.z;
+    
+    gl_Position = projectionMatrix * viewMatrix * modelMatrix * localPos;
   }
 `;
 
@@ -389,31 +450,44 @@ const PETAL_FRAGMENT = `
   precision mediump float;
   varying vec2 vUv;
   varying vec3 vColor;
+  varying float vDepth;
   
   void main() {
-    vec2 center = vUv - 0.5;
-    float dist = length(center);
-    float alpha = 1.0 - smoothstep(0.4, 0.5, dist);
+    // Soft, Airy Petal Shape
+    vec2 st = vUv * 2.0 - 1.0;
+    float dist = length(st);
+    
+    // Soft circle with feathering
+    float alpha = smoothstep(0.5, 0.3, dist);
+    
+    // Inner brightness/gradient
+    vec3 color = mix(vColor, vec3(1.0), (1.0 - dist) * 0.4);
+    
+    // Depth fog (fade out distant particles)
+    float fog = smoothstep(-150.0, 50.0, vDepth);
+    
     if (alpha < 0.01) discard;
     
-    // Add subtle gradient to petal
-    gl_FragColor = vec4(vColor, 0.9 * alpha);
+    gl_FragColor = vec4(color, alpha * 0.8 * fog);
   }
 `;
 
 const ZenBlossom = ({ config }: { config: any }) => {
-  const count = 40000; // Increased density
+  // Balanced count for density vs performance
+  const count = 12000;
   const meshRef = useRef<THREE.InstancedMesh>(null);
-  const debugCursorRef = useRef<THREE.Group>(null);
 
-  // Raycasting Variables (Stable references)
-  const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), []);
-  const target = useMemo(() => new THREE.Vector3(), []);
+  // Reusable Interaction Objects
+  const { raycaster, plane, target, mouseVec } = useMemo(() => ({
+    raycaster: new THREE.Raycaster(),
+    plane: new THREE.Plane(new THREE.Vector3(0, 0, 1), 0),
+    target: new THREE.Vector3(),
+    mouseVec: new THREE.Vector2()
+  }), []);
 
-  // Create Geometry & Attributes ONCE
+  // Geometry & Attributes
   const { geometry, uniforms } = useMemo(() => {
-    // PETAL SHAPE: Plane is fine, but let's make it look more like a petal with the shader
+    // Use a simple Plane for the particle, handled by shader
     const geo = new THREE.PlaneGeometry(1, 1);
 
     const offsets = new Float32Array(count * 3);
@@ -422,24 +496,24 @@ const ZenBlossom = ({ config }: { config: any }) => {
     const rotSpeeds = new Float32Array(count);
     const colors = new Float32Array(count * 3);
 
-    // CALM SAKURA PALETTE
+    // Organic Palette: Elegant Reds & Crimsons (User Requested "Shade of Red")
     const palette = [
-      new THREE.Color('#ffc1cc'), // Bubblegum Pink (Soft)
-      new THREE.Color('#ffb7b2'), // Pastel Red
-      new THREE.Color('#ffdac1'), // Peach
-      new THREE.Color('#ffe5e5'), // Very Pale Pink
+      new THREE.Color('#550000'), // Dark Maroon (Depth)
+      new THREE.Color('#990000'), // Crimson
+      new THREE.Color('#cc0000'), // Pure Red
+      new THREE.Color('#ff3333'), // Bright Red
+      new THREE.Color('#ff9999'), // Soft Rose Highlight
     ];
 
     for (let i = 0; i < count; i++) {
-      offsets[i * 3 + 0] = randomRange(-150, 150);
-      // Distribute Y so they start pre-filled across the height
-      offsets[i * 3 + 1] = randomRange(-75, 75);
-      // FIX: Push Z back so they don't clip camera (Camera is at +15)
-      offsets[i * 3 + 2] = randomRange(-80, -10);
+      // Spread across a wide volume
+      offsets[i * 3 + 0] = randomRange(-200, 200); // X
+      offsets[i * 3 + 1] = randomRange(-125, 125); // Y
+      offsets[i * 3 + 2] = randomRange(-100, 50);  // Z
 
-      scales[i] = randomRange(0.4, 0.8); // Bigger, softer petals
-      speeds[i] = randomRange(0.5, 1.2);
-      rotSpeeds[i] = randomRange(0.5, 2.0);
+      scales[i] = randomRange(0.5, 1.2); // Varied sizes
+      speeds[i] = randomRange(0.6, 1.4);
+      rotSpeeds[i] = randomRange(0.5, 2.5);
 
       const col = palette[Math.floor(Math.random() * palette.length)];
       colors[i * 3 + 0] = col.r;
@@ -447,77 +521,88 @@ const ZenBlossom = ({ config }: { config: any }) => {
       colors[i * 3 + 2] = col.b;
     }
 
-    // Explicitly set bounding sphere to HUGE to prevent culling
-    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 500);
-
     geo.setAttribute('aOffset', new THREE.InstancedBufferAttribute(offsets, 3));
     geo.setAttribute('aScale', new THREE.InstancedBufferAttribute(scales, 1));
     geo.setAttribute('aSpeed', new THREE.InstancedBufferAttribute(speeds, 1));
     geo.setAttribute('aRotSpeed', new THREE.InstancedBufferAttribute(rotSpeeds, 1));
     geo.setAttribute('aColor', new THREE.InstancedBufferAttribute(colors, 3));
 
+    // Large bounding sphere to prevent culling when displaced
+    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 500);
+
     const unifs = {
       uTime: { value: 0 },
-      uVerticalSpeed: { value: 15.0 }, // Slightly faster fall
-      uWindSpeed: { value: 0.3 },
       uMouseWorld: { value: new THREE.Vector3(1000, 1000, 1000) },
-      uMouseRadius: { value: 100.0 },
+
+      // Start with a reasonable world-space radius (Camera height is ~15-20 units)
+      // So a radius of 6.0 is about 1/3rd of the screen height.
+      uMouseRadius: { value: 6.0 },
+      uCursorForce: { value: 1.0 },
     };
 
     return { geometry: geo, uniforms: unifs };
-  }, [config]);
+  }, []);
 
-  // Raycaster for precise interaction
+  const { isPaused } = useSettings();
+
+  // Animation Loop
   useFrame((state, delta) => {
-    if (!meshRef.current) return;
+    if (!meshRef.current || isPaused) return;
+
     const mat = meshRef.current.material as THREE.ShaderMaterial;
     mat.uniforms.uTime.value += delta;
 
-    // --- PRECISE PHYSICS MOUSE TRACKING ---
-    // 1. Convert Global Cursor to Normalized Device Coords (-1..1) for Raycaster
-    const ndcX = (cursorState.x / window.innerWidth) * 2 - 1;
-    const ndcY = -(cursorState.y / window.innerHeight) * 2 + 1; // Flip Y
+    // Update Forces from Config (Converted to World Scale)
+    // Config force 0.6 -> shader force ~1.0
+    mat.uniforms.uCursorForce.value = config.physics.cursorForce * 2.0;
 
-    // 2. Raycast to find "Ideal" World Position
-    raycaster.setFromCamera({ x: ndcX, y: ndcY } as any, state.camera);
+    // --- INTERACTION LOGIC ---
+    // Map cursor to Normalized Device Coordinates
+    const ndcX = (cursorState.x / window.innerWidth) * 2 - 1;
+    const ndcY = -(cursorState.y / window.innerHeight) * 2 + 1;
+
+    // Raycast to invisible plane Z=0
+    mouseVec.set(ndcX, ndcY);
+    raycaster.setFromCamera(mouseVec, state.camera);
     const hit = raycaster.ray.intersectPlane(plane, target);
 
-    // Only update if we actually hit the physics plane
     if (hit) {
-      // 3. Apply Viscosity/Smoothing to the Uniform Value
+      const lerpSpeed = 0.15;
+
       const currentPos = mat.uniforms.uMouseWorld.value;
-      const { viscosity, cursorForce } = config.physics;
+      currentPos.x = THREE.MathUtils.lerp(currentPos.x, target.x, lerpSpeed);
+      currentPos.y = THREE.MathUtils.lerp(currentPos.y, target.y, lerpSpeed);
 
-      const lerpFactor = (1 - viscosity) * 2.0; // Responsiveness
+      // Dynamic Radius based on cursor velocity (optional flare)
+      const velocity = Math.abs(cursorState.vx) + Math.abs(cursorState.vy);
 
-      currentPos.x = THREE.MathUtils.lerp(currentPos.x, target.x, lerpFactor);
-      currentPos.y = THREE.MathUtils.lerp(currentPos.y, target.y, lerpFactor);
+      // Convert Pixel Velocity to approx World Velocity Factor
+      // 1000px width ~ 30 world units => ratio 0.03
+      const worldVel = velocity * 0.03;
 
-      // Safety Clamp for Velocity inputs
-      const safeVx = Math.min(Math.abs(cursorState.vx), 50); // Clamp max speed influence
-      const safeVy = Math.min(Math.abs(cursorState.vy), 50);
+      // Base radius from config (scaled down from pixels to world)
+      // config.influenceRadius (300) -> ~9.0 world units
+      const baseRadius = config.physics.influenceRadius * 0.03;
 
-      // Update Interaction Radius dynamically based on interaction force
-      // Clamp the radius to prevent explosion
-      const targetRadius = config.physics.influenceRadius + (safeVx + safeVy) * 0.5;
-      const safeRadius = Math.min(targetRadius, 500); // Max radius cap
+      const targetRadius = baseRadius + Math.min(worldVel, 5.0);
 
       mat.uniforms.uMouseRadius.value = THREE.MathUtils.lerp(
         mat.uniforms.uMouseRadius.value,
-        safeRadius,
+        targetRadius,
         0.1
       );
     }
-    // If no hit (e.g. mouse off screen), we just keep the last known position/radius (or could slowly decay radius)
   });
 
   return (
     <>
-      <mesh position={[0, 0, -80]}>
+      {/* Background Gradient / Tint */}
+      <mesh position={[0, 0, -120]}>
         <planeGeometry args={[1000, 1000]} />
         <meshBasicMaterial color={config.colors.hexBg} />
       </mesh>
 
+      {/* The Particles */}
       <instancedMesh ref={meshRef} args={[geometry, undefined, count]} frustumCulled={false}>
         <shaderMaterial
           vertexShader={PETAL_VERTEX}
@@ -526,7 +611,7 @@ const ZenBlossom = ({ config }: { config: any }) => {
           transparent={true}
           depthWrite={false}
           side={THREE.DoubleSide}
-          blending={THREE.AdditiveBlending}
+          blending={THREE.NormalBlending}
         />
       </instancedMesh>
     </>

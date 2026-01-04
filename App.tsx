@@ -213,7 +213,7 @@ const PortfolioContent = () => {
                       I Architect
                     </span>
                     <span className="block text-5xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-accent-primary via-cyan-400 to-accent-secondary drop-shadow-lg tracking-tight pb-4">
-                      Liquid<br className="hidden md:block" /> Intelligence
+                      Liquid<br /> Intelligence
                     </span>
                   </h2>
 

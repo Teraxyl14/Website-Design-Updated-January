@@ -61,7 +61,7 @@ const Dropdown: React.FC<DropdownProps> = ({ label, options, selected, onSelect,
 };
 
 export const ReportArchive = () => {
-  const { isPlainText } = useSettings();
+  const { isPlainText, currentTheme } = useSettings();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All Categories');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -71,6 +71,7 @@ export const ReportArchive = () => {
   const gridTopRef = useRef<HTMLDivElement>(null);
 
   const itemsPerPage = 10;
+  const isSakura = currentTheme?.id === 'sakura';
 
   // Extract unique categories
   const categories = useMemo(() => {
@@ -262,7 +263,7 @@ export const ReportArchive = () => {
               onClick={() => setExpandedId(expandedId === report.id ? null : report.id)}
               className={`
                 relative overflow-hidden cursor-pointer group
-                glass-panel
+                ${isSakura ? 'bg-[#420a0a]/90 border-red-300/20 shadow-lg' : 'glass-panel'}
                 transition-all duration-500
                 hover:border-accent-primary
                 ${expandedId === report.id ? 'border-accent-primary shadow-[0_0_30px_rgba(var(--accent-primary),0.2)]' : ''}
@@ -274,11 +275,11 @@ export const ReportArchive = () => {
                     <span className="text-[10px] font-mono tracking-wider text-accent-primary px-2 py-0.5 rounded border border-accent-primary/20 bg-accent-primary/5">
                       {report.id}
                     </span>
-                    <span className="text-[10px] font-mono tracking-wider text-text-secondary uppercase bg-white/5 px-2 py-0.5 rounded">
+                    <span className={`text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded ${isSakura ? 'text-white/70 bg-white/10' : 'text-text-secondary bg-white/5'}`}>
                       {report.category}
                     </span>
                   </div>
-                  <h3 className="text-xl md:text-2xl font-bold text-text-primary group-hover:text-accent-primary transition-colors">
+                  <h3 className={`text-xl md:text-2xl font-bold transition-colors ${isSakura ? 'text-white group-hover:text-red-300' : 'text-text-primary group-hover:text-accent-primary'}`}>
                     {report.title}
                   </h3>
                 </div>

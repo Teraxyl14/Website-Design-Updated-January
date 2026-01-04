@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowUpRight } from 'lucide-react';
 import { Project } from '../types';
+import { useSettings } from '../context/SettingsContext';
 
 interface ProjectCardProps {
   project: Project;
@@ -9,6 +10,9 @@ interface ProjectCardProps {
 }
 
 export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, index }) => {
+  const { currentTheme } = useSettings();
+  const isSakura = currentTheme.id === 'sakura';
+
   return (
     <motion.a
       href={project.link}
@@ -25,17 +29,18 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, in
       }}
       className="group relative block h-full perspective-1000"
     >
-      <div className="
+      <div className={`
         relative h-full
-        rounded-[2rem] border border-border/40 
-        bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-3xl
+        rounded-[2rem] border 
+        ${isSakura ? 'bg-[#420a0a]/90 border-red-300/20' : 'border-border/40 bg-gradient-to-b from-card/80 to-card/40'}
+        backdrop-blur-3xl
         overflow-hidden
         transition-all duration-500
         group-hover:border-[rgb(var(--accent-primary))]/50
         group-hover:translate-y-[-4px]
         group-hover:shadow-[0_20px_50px_-20px_rgba(var(--accent-primary),0.3)]
         flex flex-col
-      ">
+      `}>
 
         {/* Image Container with liquid zoom */}
         <div className="h-56 md:h-72 overflow-hidden relative shrink-0">
@@ -62,11 +67,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, in
           {/* Glow effect behind text */}
           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-transparent to-accent-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
-          <h3 className="relative z-10 text-2xl md:text-3xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-[rgb(var(--text-primary))] via-[rgb(var(--text-primary))] to-[rgb(var(--text-secondary))] mb-4 group-hover:to-[rgb(var(--accent-primary))] transition-all duration-300">
+          <h3 className={`relative z-10 text-2xl md:text-3xl font-heading font-bold mb-4 transition-all duration-300 ${isSakura ? 'text-white' : 'text-transparent bg-clip-text bg-gradient-to-r from-[rgb(var(--text-primary))] via-[rgb(var(--text-primary))] to-[rgb(var(--text-secondary))] group-hover:to-[rgb(var(--accent-primary))]'}`}>
             {project.title}
           </h3>
 
-          <p className="relative z-10 text-base text-[rgb(var(--text-secondary))]/80 leading-relaxed mb-8 flex-1">
+          <p className={`relative z-10 text-base leading-relaxed mb-8 flex-1 ${isSakura ? 'text-white/80' : 'text-[rgb(var(--text-secondary))]/80'}`}>
             {project.description}
           </p>
 
@@ -74,7 +79,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, in
             {project.tech.map((t, i) => (
               <span
                 key={i}
-                className="px-3 py-1.5 text-[10px] uppercase tracking-wider font-bold rounded-lg bg-[rgb(var(--accent-primary))]/5 text-[rgb(var(--text-secondary))] border border-[rgb(var(--border-color))]/50 transition-colors duration-300 group-hover:bg-[rgb(var(--accent-primary))]/10 group-hover:text-[rgb(var(--accent-primary))] group-hover:border-[rgb(var(--accent-primary))]/30"
+                className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-bold rounded-lg border transition-colors duration-300 ${isSakura ? 'bg-white/10 text-white border-white/20' : 'bg-[rgb(var(--accent-primary))]/5 text-[rgb(var(--text-secondary))] border-[rgb(var(--border-color))]/50 group-hover:bg-[rgb(var(--accent-primary))]/10 group-hover:text-[rgb(var(--accent-primary))] group-hover:border-[rgb(var(--accent-primary))]/30'}`}
               >
                 {t}
               </span>
